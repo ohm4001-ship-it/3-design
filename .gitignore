@@ -2,6 +2,9 @@ node_modules/
 dist/
 out/
 out-*/
+out-*.zip
+__pycache__/
+*.pyc
 tmp/
 # Local Hunyuan3D checkout, venv and model cache (tools/hunyuan-local/README.md)
 local-ai/

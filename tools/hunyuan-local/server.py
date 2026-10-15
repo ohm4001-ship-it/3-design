@@ -21,6 +21,8 @@ import argparse
 import base64
 import io
 import json
+import random
+import os
 import sys
 import tempfile
 import threading
@@ -49,14 +51,25 @@ def load_pipeline(repo: str, low_vram: bool):
 
     if not torch.cuda.is_available():
         raise SystemExit("CUDA GPU를 찾지 못했습니다 (torch.cuda.is_available() == False).")
-    pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(MODEL, subfolder=SUBFOLDER, variant="fp16")
+    pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(
+        MODEL, subfolder=SUBFOLDER, variant="fp16", device="cpu" if low_vram else "cuda"
+    )
     pipeline.enable_flashvdm()
     if low_vram:
+        # Upstream's standalone pipeline does not inherit DiffusionPipeline's
+        # components property; its offload helper nevertheless expects it.
+        pipeline.components = {
+            "conditioner": pipeline.conditioner,
+            "model": pipeline.model,
+            "vae": pipeline.vae,
+        }
         pipeline.enable_model_cpu_offload()
+        # Tensors are prepared on the execution GPU while hooks move modules.
+        pipeline.device = torch.device("cuda:0")
     return pipeline, torch.cuda.get_device_name(0)
 
 
-def decode_views(payload: dict) -> dict:
+def decode_views(payload: dict, remove_background) -> dict:
     from PIL import Image
 
     views = payload.get("views") or {}
@@ -66,8 +79,8 @@ def decode_views(payload: dict) -> dict:
         if not data:
             continue
         image = Image.open(io.BytesIO(base64.b64decode(data))).convert("RGBA")
-        if image.getchannel("A").getextrema()[0] == 255:
-            raise ValueError(f"'{key}' 이미지에 투명 배경(알파)이 없습니다.")
+        if payload.get("removeBackground", False) or image.getchannel("A").getextrema()[0] == 255:
+            image = remove_background(image.convert("RGB"))
         images[key] = image
     if "front" not in images:
         raise ValueError("front 이미지가 필요합니다.")
@@ -76,11 +89,24 @@ def decode_views(payload: dict) -> dict:
 
 def main() -> None:
     args = parse_args()
+    root = Path(args.repo).resolve().parent
+    os.environ.setdefault("HF_HOME", str(root / "cache" / "huggingface"))
+    os.environ.setdefault("HY3DGEN_MODELS", str(root / "models"))
+    os.environ.setdefault("U2NET_HOME", str(root / "models" / "rembg"))
+    os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
+    # remove() uses ONNX masks with alpha_matting=False. Avoid compiling the
+    # unused pymatting kernels on first launch; PyTorch inference is unaffected.
+    os.environ.setdefault("NUMBA_DISABLE_JIT", "1")
     print(f"[hunyuan-local] {MODEL}/{SUBFOLDER} 불러오는 중…", flush=True)
     pipeline, device = load_pipeline(args.repo, args.low_vram)
     import torch
 
     gpu = threading.Lock()
+    from rembg import remove, new_session
+    # Pin the classic rembg model rather than following changed package defaults.
+    background_session = new_session("u2net", providers=["CPUExecutionProvider"])
+    def remove_background(image):
+        return remove(image, session=background_session, bgcolor=[255, 255, 255, 0])
 
     class Handler(BaseHTTPRequestHandler):
         def _json(self, status: int, body: dict) -> None:
@@ -103,21 +129,25 @@ def main() -> None:
                 return
             try:
                 payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
-                images = decode_views(payload)
+                images = decode_views(payload, remove_background)
             except Exception as error:  # malformed request
                 self._json(400, {"error": str(error)})
                 return
             try:
                 with gpu:
                     started = time.time()
+                    seed = random.randint(0, 10_000_000) if payload.get("randomizeSeed", False) else int(payload.get("seed", 1234))
                     mesh = pipeline(
                         image=images,
                         num_inference_steps=int(payload.get("steps", 5)),
                         octree_resolution=int(payload.get("octree", 256)),
                         num_chunks=int(payload.get("chunks", 8000)),
-                        generator=torch.manual_seed(int(payload.get("seed", 1234))),
+                        guidance_scale=float(payload.get("guidance", 5)),
+                        generator=torch.manual_seed(seed),
                         output_type="trimesh",
                     )[0]
+                    for hook in getattr(pipeline, "_all_hooks", []):
+                        hook.offload()
                     torch.cuda.empty_cache()
                 with tempfile.TemporaryDirectory() as folder:
                     path = Path(folder) / "shape.glb"
@@ -137,6 +167,8 @@ def main() -> None:
             self.send_response(200)
             self.send_header("Content-Type", "model/gltf-binary")
             self.send_header("Content-Length", str(len(data)))
+            self.send_header("X-Hunyuan-Seed", str(seed))
+            self.send_header("X-Hunyuan-Faces", str(len(mesh.faces)))
             self.end_headers()
             self.wfile.write(data)
 

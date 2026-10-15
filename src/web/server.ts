@@ -3,7 +3,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import sharp from "sharp";
@@ -56,8 +56,12 @@ import {
   type Mesh,
 } from "../mesh/index.ts";
 import { resolveProvider, aiProvider } from "../generate/index.ts";
+import { createHunyuanHandler } from "./hunyuan.ts";
 export interface ServerOptions {
   readonly port: number;
+  readonly host?: string;
+  /** Give each browser an unguessable, server-issued workspace for public sharing. */
+  readonly isolatedSessions?: boolean;
   /** Directory holding `front.png` … `top.png`, `views.json`, and every derived file. */
   readonly directory: string;
 }
@@ -107,6 +111,8 @@ export async function startServer(
 ): Promise<RunningServer> {
   const directory = resolve(options.directory);
   await mkdir(directory, { recursive: true });
+  const sessions = new Map<string, string>();
+  const handleHunyuan = createHunyuanHandler();
   // Mutations and builds touch the same files; run them one at a time.
   let queue: Promise<unknown> = Promise.resolve();
   const serial = <T>(task: () => Promise<T>): Promise<T> => {
@@ -116,7 +122,56 @@ export async function startServer(
   };
 
   const server = createServer((request, response) => {
-    handle(request, response, directory, serial).catch((error: unknown) => {
+    if (request.url === "/healthz") return json(response, { status: "ok" });
+    let workspace = directory;
+    if (options.isolatedSessions) {
+      const cookie = request.headers.cookie
+        ?.split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith("sixview-session="))
+        ?.slice("sixview-session=".length);
+      let session = cookie && sessions.has(cookie) ? cookie : undefined;
+      if (!session) {
+        session = randomUUID();
+        sessions.set(session, join(directory, session));
+        const secure =
+          request.headers["x-forwarded-proto"] === "https" ? "; Secure" : "";
+        response.setHeader(
+          "Set-Cookie",
+          `sixview-session=${session}; HttpOnly; SameSite=Lax; Path=/${secure}`,
+        );
+      }
+      workspace = sessions.get(session)!;
+      response.setHeader("Vary", "Cookie");
+      if (request.method === "POST" && request.headers.origin) {
+        let sameOrigin = false;
+        try {
+          sameOrigin =
+            new URL(request.headers.origin).host === request.headers.host;
+        } catch {
+          /* Invalid origins are rejected below. */
+        }
+        if (!sameOrigin) {
+          response.writeHead(403, {
+            "Content-Type": "text/plain; charset=utf-8",
+          });
+          response.end("현재 사이트에서 작업을 다시 실행하세요.");
+          return;
+        }
+      }
+    }
+    const run = async () => {
+      if (options.isolatedSessions) await mkdir(workspace, { recursive: true });
+      if (await handleHunyuan(request, response, workspace)) return;
+      return handle(
+        request,
+        response,
+        workspace,
+        serial,
+        options.isolatedSessions,
+      );
+    };
+    run().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       if (!response.headersSent) {
         response.writeHead(error instanceof HttpError ? error.status : 500, {
@@ -133,7 +188,7 @@ export async function startServer(
     reject,
   } = Promise.withResolvers<RunningServer>();
   server.once("error", reject);
-  server.listen(options.port, "127.0.0.1", () => {
+  server.listen(options.port, options.host ?? "127.0.0.1", () => {
     const address = server.address();
     const port =
       typeof address === "object" && address ? address.port : options.port;
@@ -154,6 +209,7 @@ async function handle(
   response: ServerResponse,
   directory: string,
   serial: Serial,
+  publicWorkspace = false,
 ): Promise<void> {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const path = url.pathname;
@@ -161,7 +217,10 @@ async function handle(
   // `/`, `/viewer`, built assets, and the viewer's model listing.
   if (await handleCadRequest(request, response, directory)) return;
   if (path === "/api/state")
-    return json(response, await serial(() => state(directory)));
+    return json(
+      response,
+      await serial(() => state(directory, publicWorkspace)),
+    );
   const projectionRoute =
     /^\/api\/reprojection\/(front|back|left|right|top)$/.exec(path);
   if (projectionRoute) {
@@ -477,7 +536,7 @@ async function handle(
         }
         await rm(join(directory, RESULT_FILE), { force: true });
         await rm(join(directory, "model-manifest.json"), { force: true });
-        return state(directory);
+        return state(directory, publicWorkspace);
       }),
     );
   }
@@ -495,7 +554,7 @@ async function handle(
         else await transform(directory, id, body);
         await rm(join(directory, RESULT_FILE), { force: true });
         await rm(join(directory, "model-manifest.json"), { force: true });
-        return state(directory);
+        return state(directory, publicWorkspace);
       }),
     );
   }
@@ -511,7 +570,7 @@ async function handle(
         await swapViews(directory, a, b);
         await rm(join(directory, "model-manifest.json"), { force: true });
         await rm(join(directory, RESULT_FILE), { force: true });
-        return state(directory);
+        return state(directory, publicWorkspace);
       }),
     );
   }
@@ -521,7 +580,7 @@ async function handle(
       response,
       await serial(async () => {
         await checkRevision(request, directory);
-        return generate(directory, options);
+        return generate(directory, options, publicWorkspace);
       }),
     );
   }
@@ -654,7 +713,11 @@ async function swapViews(
     [b]: transforms[a],
   });
 }
-async function generate(directory: string, body: unknown): Promise<unknown> {
+async function generate(
+  directory: string,
+  body: unknown,
+  publicWorkspace = false,
+): Promise<unknown> {
   const options =
     typeof body === "object" && body !== null
       ? (body as Record<string, unknown>)
@@ -727,10 +790,13 @@ async function generate(directory: string, body: unknown): Promise<unknown> {
     `${JSON.stringify(stored, null, 2)}\n`,
     "utf8",
   );
-  return state(directory);
+  return state(directory, publicWorkspace);
 }
 /** The whole page state: views (prepared on the fly), validation, and the last build. */
-async function state(directory: string): Promise<unknown> {
+async function state(
+  directory: string,
+  publicWorkspace = false,
+): Promise<unknown> {
   const paths = await viewPathsFromDirectory(directory);
   const transforms = await loadTransforms(directory);
   const set = await prepareViewSet(paths, transforms);
@@ -841,7 +907,7 @@ async function state(directory: string): Promise<unknown> {
     // No build since the inputs last changed.
   }
   return {
-    directory,
+    directory: publicWorkspace ? "이 브라우저 전용 작업 공간" : directory,
     revision: reconstructionIdentity(reconstruction),
     reconstruction,
     initialUrl: reconstruction.meshId

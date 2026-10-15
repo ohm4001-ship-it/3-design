@@ -1,0 +1,36 @@
+✔ a generated shape handed back turned, scaled and shifted is put back into the views' frame (1223.7444ms)
+✔ silhouette correction pulls an oversized shape back inside the hull (1775.2804ms)
+✔ the AI method falls back to silhouettes and says why when generation fails (5139.9846ms)
+✔ a clean five-view render passes and recovers the mesh proportions (792.5938ms)
+✔ a view framed at its own zoom is re-scaled into the common frame (620.1664ms)
+✔ a top view turned 90° is named as rotated, and the stored rotation fixes it (1187.3851ms)
+✔ a view that contradicts the others fails agreement and is named (1216.0261ms)
+✔ a fragmented silhouette is reported as a broken view (1655.722ms)
+✔ a missing top view fails the set instead of scoring well on the rest (1424.5844ms)
+✔ versioned records survive legacy transform writes and invalidate stale identities (64.1152ms)
+✔ measured spans use uniform scale, expose conflicts and roundtrip GLB meters / OBJ millimeters (4.6124ms)
+✔ protection validates actual surface paths and through visibility, refusing a filled hole (144.1993ms)
+✔ real HTTP rejects stale/forged input, keeps initial-only truthful and blocks orphan downloads (10193.5927ms)
+✔ physical camera projects known world points with +Y down and rejects behind camera (3.1923ms)
+✔ duplicate landmarks do not resolve the direction of a symmetric object (75.9069ms)
+✔ raw orientation, crop and resize preserve invertible pixel coordinates (0.6226ms)
+✔ known canonical axes share the same projection contract used by the renderer (0.322ms)
+✔ finite photo fit corrects tilted physical cameras using fixed-mesh correspondences (77.9883ms)
+✔ photo fitting covers both signs of 5/10/15 degree yaw, pitch and roll without moving the mesh (1121.8711ms)
+✔ local direct generation forwards official view order and controls without modifying GLB (75.1825ms)
+✔ direct jobs preserve provider GLB bytes, isolate downloads and fail without silhouette fallback (276.8966ms)
+✔ the reconstructed mesh re-projects onto every input silhouette (1757.1142ms)
+✔ the exported surface is closed: every edge is shared by exactly two triangles (2731.0112ms)
+✔ building without the top view is refused (1599.9723ms)
+✔ views that agree on the surface score full colour agreement (3488.7827ms)
+✔ a view painted in different colours keeps its outline but loses colour agreement (2983.8715ms)
+✔ colour distance tolerates shading but not a change of colour (3.5252ms)
+✔ public sharing isolates browser uploads, assets and mutations (504.001ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 28
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13064.0758

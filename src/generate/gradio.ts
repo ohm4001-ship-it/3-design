@@ -22,7 +22,10 @@ export function huggingFaceToken(): string | undefined {
   if (fromEnv) return fromEnv;
   const path =
     process.env["HF_TOKEN_PATH"] ??
-    join(process.env["HF_HOME"] ?? join(homedir(), ".cache", "huggingface"), "token");
+    join(
+      process.env["HF_HOME"] ?? join(homedir(), ".cache", "huggingface"),
+      "token",
+    );
   try {
     return readFileSync(path, "utf8").trim() || undefined;
   } catch {
@@ -82,15 +85,24 @@ export class GradioSpace {
 
   async #loadConfig(): Promise<Map<string, number>> {
     if (this.#functions) return this.#functions;
-    const response = await fetch(`${this.host}/config`, { headers: this.#headers() });
+    const response = await fetch(`${this.host}/config`, {
+      headers: this.#headers(),
+      ...(this.#options.signal ? { signal: this.#options.signal } : {}),
+    });
     if (!response.ok) {
-      throw new Error(`Space 설정을 읽지 못했습니다 (${response.status}): ${this.host}`);
+      throw new Error(
+        `Space 설정을 읽지 못했습니다 (${response.status}): ${this.host}`,
+      );
     }
-    const config = (await response.json()) as { dependencies?: GradioDependency[]; api_prefix?: string };
+    const config = (await response.json()) as {
+      dependencies?: GradioDependency[];
+      api_prefix?: string;
+    };
     this.#prefix = (config.api_prefix ?? "").replace(/\/$/, "");
     const map = new Map<string, number>();
     (config.dependencies ?? []).forEach((dependency, index) => {
-      if (dependency.api_name) map.set(dependency.api_name, dependency.id ?? index);
+      if (dependency.api_name)
+        map.set(dependency.api_name, dependency.id ?? index);
     });
     this.#functions = map;
     return map;
@@ -108,7 +120,11 @@ export class GradioSpace {
     return found;
   }
 
-  async upload(bytes: Uint8Array, filename: string, mime: string): Promise<GradioFile> {
+  async upload(
+    bytes: Uint8Array,
+    filename: string,
+    mime: string,
+  ): Promise<GradioFile> {
     await this.#loadConfig();
     const form = new FormData();
     form.append("files", new Blob([bytes], { type: mime }), filename);
@@ -119,7 +135,9 @@ export class GradioSpace {
       ...(this.#options.signal ? { signal: this.#options.signal } : {}),
     });
     if (!response.ok) {
-      throw new Error(`이미지 업로드 실패 (${response.status}): ${await response.text()}`);
+      throw new Error(
+        `이미지 업로드 실패 (${response.status}): ${await response.text()}`,
+      );
     }
     const paths = (await response.json()) as string[];
     const path = paths[0];
@@ -128,7 +146,11 @@ export class GradioSpace {
   }
 
   /** Runs one function and resolves with its output data. */
-  async call(apiName: string, data: readonly unknown[], sessionHash: string): Promise<unknown[]> {
+  async call(
+    apiName: string,
+    data: readonly unknown[],
+    sessionHash: string,
+  ): Promise<unknown[]> {
     const fnIndex = await this.functionIndex(apiName);
     const join = await fetch(`${this.host}${this.#prefix}/queue/join`, {
       method: "POST",
@@ -143,18 +165,25 @@ export class GradioSpace {
       ...(this.#options.signal ? { signal: this.#options.signal } : {}),
     });
     if (!join.ok) {
-      throw new Error(`'${apiName}' 대기열 등록 실패 (${join.status}): ${await join.text()}`);
+      throw new Error(
+        `'${apiName}' 대기열 등록 실패 (${join.status}): ${await join.text()}`,
+      );
     }
 
-    const timeout = AbortSignal.timeout((this.#options.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) * 1000);
+    const timeout = AbortSignal.timeout(
+      (this.#options.timeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS) * 1000,
+    );
     const signal = this.#options.signal
       ? AbortSignal.any([this.#options.signal, timeout])
       : timeout;
 
-    const stream = await fetch(`${this.host}${this.#prefix}/queue/data?session_hash=${sessionHash}`, {
-      headers: this.#headers(),
-      signal,
-    });
+    const stream = await fetch(
+      `${this.host}${this.#prefix}/queue/data?session_hash=${sessionHash}`,
+      {
+        headers: this.#headers(),
+        signal,
+      },
+    );
     if (!stream.ok || !stream.body) {
       throw new Error(`'${apiName}' 결과 스트림 실패 (${stream.status}).`);
     }
@@ -172,7 +201,9 @@ export class GradioSpace {
         for (; split >= 0; split = buffer.indexOf("\n\n")) {
           const chunk = buffer.slice(0, split);
           buffer = buffer.slice(split + 2);
-          const line = chunk.split("\n").find((candidate) => candidate.startsWith("data: "));
+          const line = chunk
+            .split("\n")
+            .find((candidate) => candidate.startsWith("data: "));
           if (!line) continue;
           const message = JSON.parse(line.slice(6)) as QueueMessage;
 
@@ -181,10 +212,13 @@ export class GradioSpace {
               `${apiName} 대기 중 (순번 ${message.rank + 1}/${message.queue_size ?? "?"})`,
             );
           }
-          if (message.msg === "process_starts") this.#options.onProgress?.(`${apiName} 실행 중…`);
+          if (message.msg === "process_starts")
+            this.#options.onProgress?.(`${apiName} 실행 중…`);
           if (message.msg === "process_completed") {
             if (message.success === false || message.output?.error) {
-              throw new Error(`'${apiName}' 실행 실패: ${message.output?.error ?? "사유 없음"}`);
+              throw new Error(
+                `'${apiName}' 실행 실패: ${message.output?.error ?? "사유 없음"}`,
+              );
             }
             return message.output?.data ?? [];
           }
@@ -204,7 +238,9 @@ export class GradioSpace {
 }
 
 export function newSessionHash(): string {
-  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  return (
+    Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+  );
 }
 
 /**
@@ -212,8 +248,20 @@ export function newSessionHash(): string {
  * return `gr.update(value=...)` wrap the file as `{ value, __type__: "update" }`.
  */
 export function asGradioFile(value: unknown): GradioFile | null {
-  if (value && typeof value === "object" && "__type__" in value && "value" in value) return asGradioFile(value.value);
-  if (!value || typeof value !== "object" || !("path" in value) || typeof value.path !== "string") return null;
+  if (
+    value &&
+    typeof value === "object" &&
+    "__type__" in value &&
+    "value" in value
+  )
+    return asGradioFile(value.value);
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !("path" in value) ||
+    typeof value.path !== "string"
+  )
+    return null;
   // Checked above: the only required field of GradioFile is a string `path`.
   const file: GradioFile = { ...value, path: value.path };
   return file;

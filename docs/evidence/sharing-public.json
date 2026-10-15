@@ -1,0 +1,34 @@
+{
+  "url": "https://myrtle-vbulletin-also-trade.trycloudflare.com",
+  "checkedAt": "2026-10-15T04:20:50.313Z",
+  "inputs": "Built-in synthetic demo only; no Stanley photo or external AI provider used",
+  "pageStatus": 200,
+  "assets": [
+    {
+      "path": "/cad/assets/studio-C84VKitq.js",
+      "status": 200
+    },
+    {
+      "path": "/cad/assets/OBJLoader-BgGAR6z1.js",
+      "status": 200
+    },
+    {
+      "path": "/cad/assets/model-viewer-2aUXGPMm.js",
+      "status": 200
+    },
+    {
+      "path": "/cad/assets/studio-GHpfUzdl.css",
+      "status": 200
+    }
+  ],
+  "uploads": 5,
+  "otherVisitorStillEmpty": true,
+  "generated": {
+    "status": 200,
+    "triangles": 6840,
+    "glbStatus": 200,
+    "glbBytes": 206284,
+    "otherVisitorDownloadStatus": 404
+  },
+  "healthy": true
+}

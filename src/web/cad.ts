@@ -361,10 +361,12 @@ export async function handleCadRequest(
   }
   const page =
     pathname === "/"
-      ? "studio.html"
-      : pathname === "/viewer"
-        ? "viewer.html"
-        : null;
+      ? "hunyuan.html"
+      : pathname === "/studio"
+        ? "studio.html"
+        : pathname === "/viewer"
+          ? "viewer.html"
+          : null;
   if (page || pathname.startsWith("/cad/assets/")) {
     if (await serveViewerFile(page ?? pathname.slice("/cad/".length), response))
       return true;

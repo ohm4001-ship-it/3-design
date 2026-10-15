@@ -29,7 +29,7 @@ import { startServer } from "./web/server.ts";
 const USAGE = `sixview — front/back/left/right/top 5면 정투영 이미지로 3D 메시를 복원합니다.
 
 사용법
-  sixview serve   [--dir <dir>] [--port <n>]   5면 업로드·방향/정렬 보정·검증·3D 생성 + /viewer
+  sixview serve   [--dir <dir>] [--port <n>] [--host <address>] [--isolated]   5면 업로드·방향/정렬 보정·검증·3D 생성 + /viewer
   sixview analyze <dir> | --front a.png … --top e.png [--json <file>]   정렬 품질만 검사
   sixview build   <dir> | --front a.png … --top e.png [--out <dir>] [--method silhouette|ai] [--res <n>] [--symmetry] [--rounding <0..1>] [--smoothing <n>]
                   silhouette: 실루엣 교집합 → 매끈한 메시 / ai: AI 형상(Hunyuan) → 5면 실루엣 보정
@@ -79,6 +79,8 @@ async function main(argv: string[]): Promise<number> {
       json: { type: "string" },
       dir: { type: "string" },
       port: { type: "string" },
+      host: { type: "string" },
+      isolated: { type: "boolean" },
       help: { type: "boolean", short: "h" },
       front: { type: "string" },
       back: { type: "string" },
@@ -327,10 +329,19 @@ async function main(argv: string[]): Promise<number> {
       return result.report.verdict === "fail" ? 2 : 0;
     }
     case "serve": {
-      const port =
-        values.port === undefined ? 5173 : Number.parseInt(values.port, 10);
-      const directory = resolve(values.dir ?? outDirectory);
-      const server = await startServer({ port, directory });
+      const port = Number(values.port ?? process.env["PORT"] ?? 5173);
+      if (!Number.isInteger(port) || port < 0 || port > 65535)
+        throw new Error("포트는 0~65535 사이의 정수여야 합니다.");
+      const directory = resolve(
+        values.dir ?? process.env["SIXVIEW_DATA_DIR"] ?? outDirectory,
+      );
+      const server = await startServer({
+        port,
+        directory,
+        host: values.host ?? process.env["HOST"] ?? "127.0.0.1",
+        isolatedSessions:
+          values.isolated ?? process.env["SIXVIEW_ISOLATED"] === "1",
+      });
       process.stdout.write(
         `웹 미리보기: ${server.url}\n` +
           `3D 뷰어: ${server.url}viewer\n` +

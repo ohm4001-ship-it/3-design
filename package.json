@@ -11,6 +11,11 @@
     "sixview": "./dist/cli.js"
   },
   "scripts": {
+    "start": "node dist/cli.js serve",
+    "build:app": "npm run build && npm run cad:build",
+    "share": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/share.ps1",
+    "share:status": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/share.ps1 -Action status",
+    "share:stop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/share.ps1 -Action stop",
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "cli": "node src/cli.ts",

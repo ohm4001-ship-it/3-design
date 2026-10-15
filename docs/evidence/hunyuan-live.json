@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-10-15T06:59:53.490Z",
+  "url": "https://mild-trunk-rabbit-dirt.trycloudflare.com",
+  "engine": "local",
+  "model": "tencent/Hunyuan3D-2mv/hunyuan3d-dit-v2-mv-turbo",
+  "vae": "tencent/Hunyuan3D-2/hunyuan3d-vae-v2-0-turbo",
+  "gpu": "NVIDIA GeForce RTX 4070 Laptop GPU 8GB",
+  "inputs": "4 synthetic mug renders; sample left/right mapped to official subject-side slots",
+  "parameters": {
+    "steps": 5,
+    "resolution": 256,
+    "guidance": 5,
+    "chunks": 8000,
+    "seed": 1234,
+    "removeBackground": false,
+    "randomizeSeed": false
+  },
+  "generationSecondsFromServerLog": 23.2,
+  "triangles": 349800,
+  "vertices": 174901,
+  "bytes": 6297200,
+  "sha256": "d969aee4806603e78f41f84106c1054e533cfa7f8cc7186fff2a3969fd3c83d6",
+  "browserPreview": true,
+  "browserDownload": true,
+  "consoleErrors": 0,
+  "externalSpaceAttempt": "Failed with ZeroGPU quota; local inference succeeded independently",
+  "limitations": [
+    "Single synthetic sample, not real-photo accuracy evaluation",
+    "No texture generation",
+    "Temporary PC-hosted share URL"
+  ]
+}
