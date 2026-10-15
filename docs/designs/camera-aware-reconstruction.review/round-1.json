@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "round": 1,
+  "document": "C:\\Users\\SSAFY\\Desktop\\2dto3d\\docs\\designs\\camera-aware-reconstruction.md",
+  "quality_score": 8,
+  "dimensions": {
+    "completeness": "ISSUES",
+    "consistency": "ISSUES",
+    "clarity": "PASS",
+    "scope": "PASS",
+    "feasibility": "PASS"
+  },
+  "findings": [
+    {
+      "id": "R1-1",
+      "dimension": "completeness",
+      "severity": "blocking",
+      "changed_text": null,
+      "problem": "형상 보호는 '지정한 보호 부위'의 손잡이 연결과 구멍 손상을 감지하고 보정을 되돌리기로 약속하지만, 보호 부위를 누가 어떤 방식으로 지정하는지는 없다. 사용자 화면에는 사진 기준점과 카메라 조작만 있어 일반 물체의 보호 부위를 설정하거나 자동 지정 결과를 확인할 경로가 정의되지 않았다. 이 지정이 없으면 약속한 보호 조건을 적용할 대상을 알 수 없다.",
+      "remedy": "보호 부위의 지정 방식을 결정한다. 예를 들어 초기 메시에서 사용자가 연결 또는 구멍을 선택하고 보정 전에 확인하도록 하거나, 지원되는 자동 감지 범위와 확인 절차를 정한다. 지정되지 않았거나 식별이 실패한 부위에 대해 보호를 보장할 수 없는 상태와 보정 허용 여부도 명시한다."
+    },
+    {
+      "id": "R1-2",
+      "dimension": "consistency",
+      "severity": "blocking",
+      "changed_text": null,
+      "problem": "기존 메시 내보내기와 보정 전후 GLB 저장을 확장하면서 치수 옵션은 'mm 단위 모델 파일'을 내보낸다고 한다. GLB/glTF의 길이 단위는 미터이므로 mm 수치를 그대로 메시 좌표에 기록하는 것으로 해석하면 외부 뷰어에서 모델이 1,000배 커진다. 메타데이터만으로 GLB의 표준 단위가 변경되지는 않으며, 현재 문서는 mm 표시값과 파일 좌표 단위의 관계를 구분하지 않는다.",
+      "remedy": "화면과 실측 입력 및 잔차는 mm로 표시하고 GLB 좌표는 미터로 변환하여 저장한다는 단위 계약을 명시한다. 별도의 mm 좌표 파일을 제공하려는 경우 형식과 단위 전달 방식을 구분하고, 내보낸 파일을 다시 읽었을 때 실측 스케일이 유지되는 검증을 치수 옵션의 통과 기준에 포함한다."
+    }
+  ],
+  "prior": []
+}

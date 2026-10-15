@@ -1,0 +1,37 @@
+
+> sixview@0.1.0 test
+> node --test test/*.test.ts
+
+✔ a generated shape handed back turned, scaled and shifted is put back into the views' frame (1041.4314ms)
+✔ silhouette correction pulls an oversized shape back inside the hull (1387.2042ms)
+✔ the AI method falls back to silhouettes and says why when generation fails (1628.4285ms)
+✔ a clean five-view render passes and recovers the mesh proportions (654.6871ms)
+✔ a view framed at its own zoom is re-scaled into the common frame (480.8646ms)
+✔ a top view turned 90° is named as rotated, and the stored rotation fixes it (1019.6874ms)
+✔ a view that contradicts the others fails agreement and is named (467.935ms)
+✔ a fragmented silhouette is reported as a broken view (534.6304ms)
+✔ a missing top view fails the set instead of scoring well on the rest (478.0065ms)
+✔ versioned records survive legacy transform writes and invalidate stale identities (41.893ms)
+✔ measured spans use uniform scale, expose conflicts and roundtrip GLB meters / OBJ millimeters (4.2801ms)
+✔ protection validates actual surface paths and through visibility, refusing a filled hole (133.2904ms)
+✔ real HTTP rejects stale/forged input, keeps initial-only truthful and blocks orphan downloads (5043.2059ms)
+✔ physical camera projects known world points with +Y down and rejects behind camera (2.8657ms)
+✔ duplicate landmarks do not resolve the direction of a symmetric object (56.9876ms)
+✔ raw orientation, crop and resize preserve invertible pixel coordinates (0.3731ms)
+✔ known canonical axes share the same projection contract used by the renderer (0.1772ms)
+✔ finite photo fit corrects tilted physical cameras using fixed-mesh correspondences (69.5432ms)
+✔ photo fitting covers both signs of 5/10/15 degree yaw, pitch and roll without moving the mesh (959.6935ms)
+✔ the reconstructed mesh re-projects onto every input silhouette (1486.545ms)
+✔ the exported surface is closed: every edge is shared by exactly two triangles (1421.48ms)
+✔ building without the top view is refused (464.2817ms)
+✔ views that agree on the surface score full colour agreement (1210.4438ms)
+✔ a view painted in different colours keeps its outline but loses colour agreement (1286.2494ms)
+✔ colour distance tolerates shading but not a change of colour (0.3271ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6190.3273

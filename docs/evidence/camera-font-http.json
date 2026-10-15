@@ -1,0 +1,20 @@
+[
+  {
+    "file": "Pretendard-Bold-BYNivUXw.woff2",
+    "status": 200,
+    "type": "font/woff2",
+    "bytes": "791156"
+  },
+  {
+    "file": "Pretendard-Regular-BhrLQoBv.woff2",
+    "status": 200,
+    "type": "font/woff2",
+    "bytes": "765892"
+  },
+  {
+    "file": "pretendard-v1.3.9-LICENSE.txt",
+    "status": 200,
+    "type": "application/octet-stream",
+    "bytes": "4418"
+  }
+]

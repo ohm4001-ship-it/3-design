@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-15",
+  "provider": "hunyuan",
+  "model": "tencent/Hunyuan3D-2mv",
+  "destination": "https://tencent-hunyuan3d-2mv.hf.space",
+  "selectedView": "front",
+  "status": "approval-blocked",
+  "inferenceRun": false,
+  "imagesUploaded": false,
+  "physicalAccuracyVerified": false,
+  "reason": "Automatic approval review rejected the execution because explicit authorization to upload this Stanley photograph to this specific external destination was absent. The command was not executed."
+}

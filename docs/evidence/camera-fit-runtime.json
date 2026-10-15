@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-15T03:19:07.201Z",
+  "triangles": 48136,
+  "milliseconds": 1269.9296,
+  "evaluations": 187,
+  "status": "aligned",
+  "iou": 0.9825353809093647,
+  "memoryBefore": {
+    "rss": 82714624,
+    "heapTotal": 22204416,
+    "heapUsed": 15646216,
+    "external": 14645579,
+    "arrayBuffers": 6255135
+  },
+  "memoryAfter": {
+    "rss": 77852672,
+    "heapTotal": 18378752,
+    "heapUsed": 11451680,
+    "external": 13263216,
+    "arrayBuffers": 4809775
+  },
+  "note": "One local bounded-work sample with synthetic projection of a 48k-triangle reference hull. Not real photo accuracy or an SLO."
+}

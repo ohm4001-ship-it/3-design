@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-15T03:17:07.025Z",
+  "dataset": "C:/Users/SSAFY/Desktop/stanley_xyz_aligned",
+  "mode": "reference",
+  "resolution": 96,
+  "inputHashes": {
+    "front": "cf829f8e9ef3768d526143eca01e1284131d4d433015625181334f0189d7346c",
+    "back": "83e3c19f39a8cea9d254199fb551e8468687ef04dff24bdfe447a3fc05c6988a",
+    "top": "db3fa97d84f1324bfd2685223ca3b968a3b2be9639251d44436b5826907a3cbc",
+    "right": "5eb2cba81da0d4ee2057a23f107fc380892edefa0e9a21e01635e9c7e6538512",
+    "left": "5a3b2b3fb8af8b91ba37dfba67378d3cda0ba060abdbbfd7bad6060e3bf57561"
+  },
+  "unchangedGeometryAndColor": true,
+  "sourcePhotosUnchanged": true,
+  "runs": [
+    {
+      "round": 0,
+      "name": "baseline",
+      "milliseconds": 1131.6228,
+      "triangles": 48136,
+      "score": 0.982707873638549,
+      "colourScore": 0.9540692989524577
+    },
+    {
+      "round": 0,
+      "name": "current",
+      "milliseconds": 1140.1244,
+      "triangles": 48136,
+      "score": 0.982707873638549,
+      "colourScore": 0.9540692989524577
+    },
+    {
+      "round": 1,
+      "name": "baseline",
+      "milliseconds": 1567.2401999999997,
+      "triangles": 48136,
+      "score": 0.982707873638549,
+      "colourScore": 0.9540692989524577
+    },
+    {
+      "round": 1,
+      "name": "current",
+      "milliseconds": 2274.0535999999997,
+      "triangles": 48136,
+      "score": 0.982707873638549,
+      "colourScore": 0.9540692989524577
+    }
+  ],
+  "note": "Two interleaved local samples; not a statistical performance claim or actual-photo reconstruction accuracy."
+}

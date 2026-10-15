@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-15T03:42:09.799Z",
+  "url": "https://tencent-hunyuan3d-2mv.hf.space/config",
+  "status": 200,
+  "apiNames": [
+    "load_example",
+    "load_example_1",
+    "load_example_2",
+    "lambda",
+    "lambda_1",
+    "shape_generation",
+    "lambda_2",
+    "lambda_3",
+    "generation_all",
+    "lambda_4",
+    "lambda_5",
+    "on_gen_mode_change",
+    "on_decode_mode_change",
+    "lambda_6",
+    "on_export_click"
+  ],
+  "inferenceRun": false,
+  "imagesUploaded": false
+}
