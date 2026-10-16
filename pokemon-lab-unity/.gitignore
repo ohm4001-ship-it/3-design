@@ -1,0 +1,14 @@
+/Library/
+/Temp/
+/Obj/
+/Logs/
+/UserSettings/
+/Builds/
+/Tests/bin/
+/Tests/obj/
+*.csproj
+!Tests/*.csproj
+*.sln
+*.slnx
+*.user
+.vs/

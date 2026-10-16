@@ -16,6 +16,7 @@ import { writeGlb } from "../src/mesh/glb.ts";
 test("local direct generation forwards official view order and controls without modifying GLB", async (t) => {
   const glb = writeGlb(boxMesh({ size: [1, 1, 1] }));
   let received: any;
+  let acknowledgeColor = false;
   const server = createServer(async (request, response) => {
     if (request.url === "/health") {
       response.end('{"ready":true}');
@@ -26,6 +27,10 @@ test("local direct generation forwards official view order and controls without 
     received = JSON.parse(Buffer.concat(parts).toString());
     response.setHeader("X-Hunyuan-Seed", "1234");
     response.setHeader("X-Hunyuan-Faces", "12");
+    if (acknowledgeColor) {
+      response.setHeader("X-Hunyuan-Color", "photo-projection");
+      response.setHeader("X-Hunyuan-Color-Coverage", "0.8");
+    }
     response.end(glb);
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -61,8 +66,47 @@ test("local direct generation forwards official view order and controls without 
   assert.equal(received.guidance, 4.5);
   assert.equal(received.steps, 10);
   assert.equal(received.removeBackground, false);
+  assert.equal(received.includeColor, false);
   assert.deepEqual(output.bytes, glb);
   assert.equal((output.stats as any).engine, "local");
+  await assert.rejects(
+    generateDirect(
+      {
+        views: { front: new Uint8Array([1]) },
+        steps: 5,
+        guidance: 5,
+        seed: 1234,
+        resolution: 256,
+        chunks: 8000,
+        removeBackground: false,
+        randomizeSeed: false,
+        includeColor: true,
+      },
+      () => {},
+      AbortSignal.timeout(2000),
+    ),
+    /색이 포함된 결과/,
+  );
+  assert.equal(received.includeColor, true);
+  acknowledgeColor = true;
+  const colored = await generateDirect(
+    {
+      views: { front: new Uint8Array([1]) },
+      steps: 5,
+      guidance: 5,
+      seed: 1234,
+      resolution: 256,
+      chunks: 8000,
+      removeBackground: false,
+      randomizeSeed: false,
+      includeColor: true,
+    },
+    () => {},
+    AbortSignal.timeout(2000),
+  );
+  assert.equal((colored.stats as any).color, "photo-projection");
+  assert.equal((colored.stats as any).colorCoverage, "0.8");
+  assert.deepEqual(colored.bytes, glb);
 });
 
 test("direct jobs preserve provider GLB bytes, isolate downloads and fail without silhouette fallback", async (t) => {
@@ -115,6 +159,10 @@ test("direct jobs preserve provider GLB bytes, isolate downloads and fail withou
   );
   assert.equal(
     (await post({ views: { front: image }, steps: NaN })).status,
+    400,
+  );
+  assert.equal(
+    (await post({ views: { front: image }, includeColor: "yes" })).status,
     400,
   );
   assert.equal(

@@ -1,0 +1,27 @@
+{
+  "job": "00a39371-0ea8-4b96-ac70-6e6386a9e613",
+  "engine": "local Hunyuan3D-2mv Turbo + photo projection",
+  "syntheticInputs": true,
+  "views": [
+    "front",
+    "back",
+    "left",
+    "right"
+  ],
+  "steps": 5,
+  "resolution": 256,
+  "seed": 1234,
+  "removeBackground": false,
+  "vertices": 174901,
+  "triangles": 349800,
+  "glbBytes": 10495372,
+  "hasVertexColor": true,
+  "darkest": 0.05306428546706835,
+  "lightest": 0.8352941870689392,
+  "sha256": "a360d211b6f806edb2d5e2efdee4548458f899269b4bc9bc6eb71656bad5c5b1",
+  "limitations": [
+    "Photo projection, not Hunyuan-Paint",
+    "Unseen surfaces inherit nearby colour",
+    "Small text and mismatched camera angles may not transfer accurately"
+  ]
+}

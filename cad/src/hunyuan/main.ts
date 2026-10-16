@@ -9,6 +9,9 @@ import {
   Box3,
   Vector3,
   Group,
+  type Material,
+  type Mesh,
+  type MeshStandardMaterial,
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -26,8 +29,9 @@ root.innerHTML = `
 <main><section class="inputs" aria-labelledby="input-title"><h2 id="input-title">Multi-view Image Prompt</h2><p class="hint">Front 한 장으로 시작할 수 있습니다. 같은 물체의 다른 방향을 추가하면 형상 파악에 도움이 됩니다.</p><div class="uploads"></div>
 <button id="sample" class="secondary" type="button">샘플 컵 넣기</button>
 <div class="modes"><label>Generation Mode<select id="mode"><option>Turbo</option><option>Fast</option><option>Standard</option></select></label><label>Decoding Mode<select id="decode"><option value="196">Low</option><option value="256" selected>Standard</option><option value="384">High</option></select></label></div>
+<div class="color-option"><label><input id="include-color" type="checkbox" checked aria-describedby="color-help"> 사진의 색과 무늬 입히기</label><p id="color-help">사진에 보이는 색을 모델에 옮깁니다. 안 보이는 면은 주변 색으로 채우며, 촬영 각도가 다르면 무늬가 어긋날 수 있습니다.</p></div>
 <details><summary>고급 설정</summary><div class="checks"><label><input id="remove" type="checkbox" checked> 배경 제거</label><label><input id="random" type="checkbox" checked> 시드 무작위 변경</label></div><div class="settings"><label>시드 (시작 번호)<input id="seed" type="number" value="1234" min="0" max="10000000"></label><label>형상 다듬기 횟수<input id="steps" type="number" value="5" min="1" max="100"></label><label>표면 세밀도<input id="resolution" type="number" value="256" min="16" max="512"></label><label>사진 반영 강도<input id="guidance" type="number" value="5" min="0" max="30" step="0.1"></label><label>한 번에 계산할 점 수<input id="chunks" type="number" value="8000" min="1000" max="5000000"></label></div></details>
-<button id="generate" class="primary" type="button" disabled>Gen Shape · 3D 생성</button><p class="disclosure">Hunyuan3D-2mv로 형상을 생성합니다. 이 PC의 GPU 서버가 준비되면 로컬에서 처리하며, 꺼져 있으면 공식 Hugging Face Space로 이미지를 전송합니다. 텍스처는 생성하지 않습니다.</p></section>
+<button id="generate" class="primary" type="button" disabled>Gen Shape · 3D 생성</button><p class="disclosure">Hunyuan3D-2mv로 형상을 생성합니다. 사진 색 입히기는 이 PC에서 처리하며, 별도 텍스처 생성 AI를 사용하지 않습니다. 색 입히기를 끄고 로컬 GPU 서버가 꺼져 있으면 공식 Hugging Face Space로 이미지를 전송합니다.</p></section>
 <section class="output" aria-labelledby="output-title"><div class="output-heading"><h2 id="output-title">Generated Mesh</h2><span id="badge">준비</span></div><div class="viewer-lighting"><label><input id="unlit" type="checkbox" checked aria-describedby="unlit-help"> 음영 없이 보기</label><span id="unlit-help">굴곡을 자세히 보려면 해제하세요. 미리보기에만 적용됩니다.</span></div><div id="viewer"><div id="empty"><span class="empty-icon">◇</span><h3>사진에서 3D로</h3><p>왼쪽에 사진을 넣고 Gen Shape를 눌러보세요.</p></div></div><div class="status"><p id="status" role="status" aria-live="polite">Front 이미지를 넣어주세요.</p><a id="download" hidden download="hunyuan3d.glb">GLB 다운로드 ↓</a></div><p class="result-note">Hunyuan이 반환한 원본 형상입니다. 드래그로 회전하고 스크롤로 확대합니다.</p><details id="stats" hidden><summary>Generation Info</summary><pre></pre></details></section></main>
 <footer>Tencent Hunyuan3D-2mv 모델을 로컬 GPU 또는 공식 Space에서 실행하는 독립 클라이언트입니다. 공식 Space 이용 시 해당 서비스의 대기열·GPU 할당량을 따릅니다. <a href="/studio">이전 보정 도구</a></footer>`;
 
@@ -121,7 +125,7 @@ function update() {
     button.disabled = busy;
   for (const element of root.querySelectorAll<
     HTMLInputElement | HTMLSelectElement
-  >(".modes select, .settings input, .checks input"))
+  >(".modes select, .settings input, .checks input, .color-option input"))
     element.disabled = busy;
 }
 function readImage(blob: Blob): Promise<string> {
@@ -211,10 +215,14 @@ let renderer: WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
 let scene: Scene;
 let camera: PerspectiveCamera;
-const unlitMaterial = new MeshBasicMaterial({ color: "#cbd2dc" });
 const unlitToggle = $<HTMLInputElement>("unlit");
+const materialPairs = new Map<
+  Mesh,
+  { original: Material | Material[]; unlit: Material | Material[] }
+>();
 unlitToggle.addEventListener("change", () => {
-  if (scene) scene.overrideMaterial = unlitToggle.checked ? unlitMaterial : null;
+  for (const [mesh, pair] of materialPairs)
+    mesh.material = unlitToggle.checked ? pair.unlit : pair.original;
 });
 let object: Group | null = null;
 let frame = 0;
@@ -223,12 +231,12 @@ function disposeObject(target = object) {
   target?.traverse((node) => {
     const mesh = node as import("three").Mesh;
     mesh.geometry?.dispose();
-    const materials = Array.isArray(mesh.material)
-      ? mesh.material
-      : mesh.material
-        ? [mesh.material]
-        : [];
-    for (const material of materials) material.dispose();
+    const pair = materialPairs.get(mesh);
+    const materials = pair
+      ? [pair.original, pair.unlit].flat()
+      : [mesh.material].flat();
+    for (const material of new Set(materials)) material?.dispose();
+    materialPairs.delete(mesh);
   });
   if (target) scene.remove(target);
 }
@@ -241,7 +249,6 @@ async function showModel(url: string) {
     renderer.domElement.setAttribute("aria-label", "생성된 Hunyuan 3D 모델");
     scene = new Scene();
     scene.background = new Color("#f7f8fa");
-    scene.overrideMaterial = unlitToggle.checked ? unlitMaterial : null;
     camera = new PerspectiveCamera(40, 1, 0.01, 100);
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -271,6 +278,29 @@ async function showModel(url: string) {
   }
   disposeObject();
   object = loaded.scene;
+  object.traverse((node) => {
+    const mesh = node as Mesh;
+    if (!mesh.isMesh) return;
+    const unlit = (material: Material) => {
+      const source = material as MeshStandardMaterial;
+      return new MeshBasicMaterial({
+        color: source.color?.clone() ?? new Color("#cbd2dc"),
+        map: source.map ?? null,
+        alphaMap: source.alphaMap ?? null,
+        vertexColors: source.vertexColors,
+        side: source.side,
+        transparent: source.transparent,
+        opacity: source.opacity,
+        alphaTest: source.alphaTest,
+      });
+    };
+    const original = mesh.material;
+    const flat = Array.isArray(original)
+      ? original.map(unlit)
+      : unlit(original);
+    materialPairs.set(mesh, { original, unlit: flat });
+    mesh.material = unlitToggle.checked ? flat : original;
+  });
   const bounds = new Box3().setFromObject(object),
     size = bounds.getSize(new Vector3());
   const scale = 2 / Math.max(size.x, size.y, size.z, 0.001);
@@ -312,6 +342,12 @@ async function apply(job: Job | null) {
       "아래 오류를 확인하고 다시 시도해주세요. 공식 Space의 GPU 할당량이나 대기 상태가 원인일 수 있습니다.";
   }
   if (job.status === "succeeded" && job.download) {
+    const colored =
+      (job.stats as { color?: string } | undefined)?.color ===
+      "photo-projection";
+    root.querySelector(".result-note")!.textContent = colored
+      ? "사진에서 옮긴 색과 무늬가 GLB 다운로드에도 포함됩니다. 드래그로 회전하고 스크롤로 확대합니다."
+      : "Hunyuan이 반환한 원본 형상입니다. 드래그로 회전하고 스크롤로 확대합니다.";
     const download = $<HTMLAnchorElement>("download");
     download.href = job.download;
     download.hidden = false;
@@ -371,6 +407,7 @@ generateButton.addEventListener("click", async () => {
       views: images,
       removeBackground: $<HTMLInputElement>("remove").checked,
       randomizeSeed: $<HTMLInputElement>("random").checked,
+      includeColor: $<HTMLInputElement>("include-color").checked,
     };
     for (const key of ["steps", "guidance", "seed", "resolution", "chunks"])
       payload[key] = Number($<HTMLInputElement>(key).value);
@@ -399,7 +436,6 @@ window.addEventListener("pagehide", () => {
   cancelAnimationFrame(frame);
   disposeObject();
   controls?.dispose();
-  unlitMaterial.dispose();
   resizeObserver?.disconnect();
   renderer?.dispose();
 });

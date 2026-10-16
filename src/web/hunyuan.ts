@@ -10,6 +10,7 @@ import {
 } from "../generate/gradio.ts";
 import { downloadMesh } from "../generate/provider.ts";
 import { localAiAvailable, localAiUrl } from "../generate/local.ts";
+import { glbHasSurfaceColor } from "../mesh/glb.ts";
 
 const VIEWS = ["front", "back", "left", "right"] as const;
 type Views = Partial<Record<(typeof VIEWS)[number], Uint8Array>>;
@@ -22,6 +23,7 @@ export interface DirectInput {
   chunks: number;
   removeBackground: boolean;
   randomizeSeed: boolean;
+  includeColor?: boolean;
 }
 export interface DirectResult {
   bytes: Uint8Array;
@@ -34,14 +36,18 @@ export type DirectGenerator = (
   signal: AbortSignal,
 ) => Promise<DirectResult>;
 
-/** Official UI slot order, without axis fitting, carving, recolouring or fallback. */
+/** Official shape generation, optionally followed by local photo colour transfer. */
 export const generateDirect: DirectGenerator = async (
   input,
   progress,
   signal,
 ) => {
   if (await localAiAvailable()) {
-    progress("이 PC의 GPU에서 Hunyuan3D-2mv 생성 중…");
+    progress(
+      input.includeColor
+        ? "이 PC의 GPU에서 형상 생성 후 사진의 색과 무늬를 입힙니다…"
+        : "이 PC의 GPU에서 Hunyuan3D-2mv 생성 중…",
+    );
     const response = await fetch(`${localAiUrl()}/generate`, {
       method: "POST",
       signal,
@@ -60,22 +66,38 @@ export const generateDirect: DirectGenerator = async (
         chunks: input.chunks,
         removeBackground: input.removeBackground,
         randomizeSeed: input.randomizeSeed,
+        includeColor: input.includeColor === true,
       }),
     });
     if (!response.ok)
       throw new Error(
         `로컬 Hunyuan 생성 실패 (${response.status}): ${await response.text()}`,
       );
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const color = response.headers.get("x-hunyuan-color");
+    if (
+      input.includeColor &&
+      (color !== "photo-projection" || !glbHasSurfaceColor(bytes))
+    )
+      throw new Error(
+        "색이 포함된 결과를 받지 못했습니다. 로컬 GPU 서버를 업데이트하고 다시 생성해주세요.",
+      );
     return {
-      bytes: new Uint8Array(await response.arrayBuffer()),
+      bytes,
       seed: response.headers.get("x-hunyuan-seed"),
       stats: {
         engine: "local",
         model: "tencent/Hunyuan3D-2mv",
         faces: response.headers.get("x-hunyuan-faces"),
+        color: color ?? "none",
+        colorCoverage: response.headers.get("x-hunyuan-color-coverage"),
       },
     };
   }
+  if (input.includeColor)
+    throw new Error(
+      "사진 색 입히기는 이 PC의 GPU 서버가 켜져 있어야 합니다. 서버를 켜거나 ‘사진의 색과 무늬 입히기’를 끄고 다시 시도해주세요.",
+    );
   const space = new GradioSpace("https://tencent-hunyuan3d-2mv.hf.space", {
     signal,
     onProgress: progress,
@@ -173,7 +195,7 @@ async function parseInput(body: unknown): Promise<DirectInput> {
       throw new InputError("이미지를 읽지 못했습니다. 다른 사진을 넣어주세요.");
     }
   }
-  for (const key of ["removeBackground", "randomizeSeed"])
+  for (const key of ["removeBackground", "randomizeSeed", "includeColor"])
     if (b[key] !== undefined && typeof b[key] !== "boolean")
       throw new InputError("체크 항목 값이 올바르지 않습니다.");
   return {
@@ -185,6 +207,7 @@ async function parseInput(body: unknown): Promise<DirectInput> {
     chunks: number(b.chunks, 8000, 1000, 5_000_000),
     removeBackground: b.removeBackground !== false,
     randomizeSeed: b.randomizeSeed !== false,
+    includeColor: b.includeColor === true,
   };
 }
 interface Job {
@@ -308,7 +331,9 @@ export function createHunyuanHandler(
         await writeFile(join(target, `${job.id}.glb`), output.bytes);
         Object.assign(job, {
           status: "succeeded",
-          message: "Hunyuan3D-2mv 형상 생성 완료",
+          message: input.includeColor
+            ? "형상 생성과 사진 색 입히기 완료 · 사진에 안 보이는 면은 주변 색으로 채웠습니다."
+            : "Hunyuan3D-2mv 형상 생성 완료",
           seed: output.seed,
           stats: output.stats,
           download: `/api/hunyuan/result?id=${job.id}`,

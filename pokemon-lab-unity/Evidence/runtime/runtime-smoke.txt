@@ -1,0 +1,2 @@
+PASS: creator save/equip, overworld generation, capture, collection, map, dungeon selection, battle animation, mandatory boon UI, full 3-room clear, guardian/rewards, save reload, ember/moon rendering.
+Unity 6000.3.26f1

@@ -11,8 +11,9 @@ Face cache.
     GET  /health    -> {"ready": true, "model": ..., "device": ...}
 
 View keys use Hunyuan's naming (its "left" shows the subject facing image-left);
-the Node client swaps sixview's left/right before sending. Images must carry an
-alpha cut-out: no background removal runs here.
+the direct client passes these labels through unchanged. Images may carry an
+alpha cut-out; opaque photographs are cut out with rembg before generation.
+Optional includeColor transfers the processed photographs onto vertex colours.
 
 Usage: python server.py --repo <Hunyuan3D-2 checkout> [--port 8090] [--low-vram]
 """
@@ -24,7 +25,6 @@ import json
 import random
 import os
 import sys
-import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -119,7 +119,7 @@ def main() -> None:
 
         def do_GET(self) -> None:
             if self.path == "/health":
-                self._json(200, {"ready": True, "model": f"{MODEL}/{SUBFOLDER}", "device": device})
+                self._json(200, {"ready": True, "model": f"{MODEL}/{SUBFOLDER}", "device": device, "photoColor": True})
             else:
                 self._json(404, {"error": "not found"})
 
@@ -149,10 +149,14 @@ def main() -> None:
                     for hook in getattr(pipeline, "_all_hooks", []):
                         hook.offload()
                     torch.cuda.empty_cache()
-                with tempfile.TemporaryDirectory() as folder:
-                    path = Path(folder) / "shape.glb"
-                    mesh.export(str(path))
-                    data = path.read_bytes()
+                    color_info = None
+                    if payload.get("includeColor", False):
+                        from photo_colors import project_colors, export_color_glb
+                        print("[hunyuan-local] 사진의 색과 무늬를 표면에 옮기는 중…", flush=True)
+                        colors, color_info = project_colors(mesh, images)
+                        data = export_color_glb(mesh, colors)
+                    else:
+                        data = mesh.export(file_type="glb")
                 print(
                     f"[hunyuan-local] {'/'.join(images)} → {len(mesh.faces):,} 삼각형, {time.time() - started:.1f}s",
                     flush=True,
@@ -169,6 +173,9 @@ def main() -> None:
             self.send_header("Content-Length", str(len(data)))
             self.send_header("X-Hunyuan-Seed", str(seed))
             self.send_header("X-Hunyuan-Faces", str(len(mesh.faces)))
+            self.send_header("X-Hunyuan-Color", "photo-projection" if color_info else "none")
+            if color_info:
+                self.send_header("X-Hunyuan-Color-Coverage", str(color_info["coverage"]))
             self.end_headers()
             self.wfile.write(data)
 
